@@ -1,0 +1,309 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xos.h>
+
+Display *dis;
+int screen;
+Window win;
+GC gc;
+
+XEvent event;
+KeySym key;
+char text[255];
+
+unsigned long HEX(char v[8]) {
+int r, g, b;
+r = 16*(v[1] - 48 - (((v[1] - 48)>>4)*7)) + v[2] - 48 - (((v[2] - 48)>>4)*7);
+g = 16*(v[3] - 48 - (((v[3] - 48)>>4)*7)) + v[4] - 48 - (((v[4] - 48)>>4)*7);
+b = 16*(v[5] - 48 - (((v[5] - 48)>>4)*7)) + v[6] - 48 - (((v[6] - 48)>>4)*7);
+return b + (g<<8) + (r<<16);
+}
+
+unsigned long RGB(int r, int g, int b) {
+return b + (g<<8) + (r<<16);
+}
+
+void init_x() {
+        dis=XOpenDisplay((char *)0);
+        screen=DefaultScreen(dis);
+        XSetWindowAttributes *attributes;
+
+        win=XCreateWindow(dis,DefaultRootWindow(dis), 0, 0, 1300, 1300, 5, CopyFromParent, CopyFromParent, CopyFromParent, 0, attributes);
+        XSetStandardProperties(dis,win,"PrimesOnHilbertCurve","hilbert",None,NULL,0,NULL);
+
+        XSelectInput(dis, win, ExposureMask|ButtonPressMask|KeyPressMask);
+
+        gc=XCreateGC(dis, win, 0,0);
+
+        XSetBackground(dis,gc,HEX("#000000"));
+        XSetForeground(dis,gc,HEX("#FFFFFF"));
+
+        XClearWindow(dis, win);
+        XMapRaised(dis, win);
+}
+
+void close_x() { // This doesn't get used. Not yet anyhow. If you're readin this you can delete it..
+        XFreeGC(dis, gc);
+        XDestroyWindow(dis,win);
+        XCloseDisplay(dis);
+        exit(1);
+};
+
+bool isPowerofFour(int n) {
+    if(n == 0) {
+        return 0;
+    };
+    while(n != 1) {
+        if(n % 2 != 0) {
+            return 0;
+        };
+        n = n>>1; 
+    };
+    return 1;
+};
+
+bool isPrime(int num) {
+    if (num <= 3) {
+        return num > 1;
+    } else if (num % 2 == 0 || num % 3 == 0) {
+        return 0;
+    } else {
+        for (int i = 5; i * i <= num; i += 6) {
+            if (num % i == 0 || num % (i + 2) == 0) {
+                return 0;
+            }
+        }
+        return 1;
+    }
+}
+
+void move(int j,int pos[], bool pix[][16385]){
+pos[2]++;
+if (isPrime(pos[2])) {
+if (pos[3]) { 
+pix[pos[4]-pos[0]][pos[1]] = 1;
+XFillRectangle(dis,win,gc,4*(pos[4]-pos[0]),4*pos[1],4,4);
+} else {
+pix[pos[0]][pos[1]] = 1;
+XFillRectangle(dis,win,gc,4*pos[0],4*pos[1],4,4);
+};
+};
+if(j==1){
+pos[1]-=1;
+};
+if(j==2){
+pos[0]+=1;
+};
+if(j==3){
+pos[1]+=1;
+};
+if(j==4){
+pos[0]-=1;
+};
+};
+
+void hilbert(int r, int d, int l, int u, int i, int pos[], bool pix[][16385]){
+if(i>0){
+i--;
+hilbert(d,r,u,l,i,pos, pix);
+move(r,pos,pix);
+
+hilbert(r,d,l,u,i,pos, pix);
+move(d,pos,pix);
+
+hilbert(r,d,l,u,i,pos, pix);
+move(l,pos,pix);
+
+hilbert(u,l,d,r,i,pos, pix);
+};
+};
+
+int main(){
+int ev, n, pos[5];
+n = 8;
+pos[0] = 0;
+pos[1] = 0;
+pos[2] = 0;
+pos[3] = 0;
+pos[4] = (1<<n)-1;
+bool pix[(1<<n)+1][16385];
+
+init_x();
+
+while(1){
+XNextEvent(dis,&event);
+	if(event.type==KeyPress){
+	break;
+	};
+};
+XSetForeground(dis,gc,HEX("#000000"));
+XFillRectangle(dis,win,gc,0,0,1000,1000);
+XSetForeground(dis,gc,HEX("#FF0000"));
+
+hilbert(2,3,4,1,n,pos, pix);
+pos[0] = 0;
+pos[1] = 0;
+pos[2] = 0;
+pos[3] = 1;
+// XSetForeground(dis,gc,HEX("#00FF00"));
+hilbert(2,3,4,1,n,pos,pix);
+
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*9,4*9,4,4);
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*9,4*9,4,4);
+
+// 70 50 is same as 60 56
+// 79 78 is same as 9 79
+
+void setmap(int width, int map[4901][10]) {
+int x, y, ox, oy, inc, oinc, over;
+for (x = 9; x<80 ; x++) {
+	for (y = 9; y<80; y++) {
+	map[(y-9)*70+x-9][0]=pix[x][y];
+	ox = x;
+	oy = y;
+	over = 0;
+		for (oinc = 1; oinc<(width+1); oinc++) {
+		oy++;
+		over++;
+		map[(y-9)*70+x-9][over/6]+=pix[ox][oy]<<(over%6);
+			for (inc = 0; inc<(2*oinc-1); inc++) {
+			ox--;
+			over++;
+			map[(y-9)*70+x-9][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			oy--;
+			over++;
+			map[(y-9)*70+x-9][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			ox++;
+			over++;
+			map[(y-9)*70+x-9][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			oy++;
+			over++;
+			map[(y-9)*70+x-9][over/6]+=pix[ox][oy]<<(over%6);
+			};
+		};
+	};
+};
+};
+
+void print_binary(int number) {
+	for (int incr = 6; incr>=0; incr--) {	
+    putc(((number>>incr) & 1) ? '1' : '0', stdout);
+	};
+}
+
+/*
+bool isUnique(int map[4901][6]) {
+int x, y, ind, sameness;
+sameness = 0;
+for (x = 0; x<71 ; x++) {
+	for (y = 0; y<71; y++) {
+		for (ind = 0; ind<4901; ind++) {
+			if (map[y*70+x]==map[ind]) {
+			sameness++;
+			// printf("%d %d is same as %d %d \n", x, y, ind%70, ind/70);
+			};
+		};
+	};
+};
+printf("%d\n", (sameness-4900)/2);
+return !(sameness-4900)/2;
+};
+*/
+
+
+int xmap[4901][10];
+
+
+
+setmap(3,xmap);
+// printf("%d %d\n", xmap[0][1], xmap[0][1]);
+// printf("%d \n", isUnique(xmap));
+print_binary(xmap[0][7]);
+print_binary(xmap[0][6]);
+print_binary(xmap[0][5]);
+print_binary(xmap[0][4]);
+print_binary(xmap[0][3]);
+print_binary(xmap[0][2]);
+print_binary(xmap[0][1]);
+print_binary(xmap[0][0]);
+printf("\n");
+
+while(1){
+XNextEvent(dis,&event);
+	if(event.type==KeyPress&&XLookupString(&event.xkey,text,255,&key,0)==1&&text[0]=='q'){
+	break;
+	};
+};
+close_x();
+return 0;
+}
+
+
+	// map[(y-9)*70+x-9] = pix[x][y] + (pix[x][y+1]<<1) + (pix[x-1][y+1]<<2) + (pix[x-1][y]<<3) + (pix[x-1][y-1]<<4) + (pix[x][y-1]<<5) + (pix[x+1][y-1]<<6) + (pix[x+1][y]<<7) + (pix[x+1][y+1]<<8);
+/*
+for (int x = 0; x<257; x++) {
+	for (int y = 0; y<257; y++) {
+		if (pix[x][y]==1) {
+		XFillRectangle(dis,win,gc,4*x,4*y,4,4);
+		};
+	};
+};
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*79,4*78,4,4);
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*38,4*73,4,4);
+
+
+
+for (int x = 0; x<257; x++) {
+	for (int y = 0; y<257; y++) {
+		if (pix[x][y]==1) {
+		XFillRectangle(dis,win,gc,4*x,4*y,4,4);
+		};
+	};
+};
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*47,4*69,4,4);
+
+XSetForeground(dis,gc,HEX("#FFFFFF"));
+XFillRectangle(dis,win,gc,4*69,4*69,4,4);
+*/
+
+/*
+		for (inc = 1; inc<(2*width); inc++) {
+		over++;
+		map[(y-9)*70+x-9]+=pix[x][y]<<over;
+		};
+
+	if (x==9&&y==9) {
+	printf("%d\n", map[(y-9)*70+x-9]);
+	};
+
+
+pix[x][y] + (pix[x][y+1]<<1) + (pix[x+1][y]<<2) + (pix[x+1][y+1]<<3) + (pix[x-1][y]<<4) + (pix[x][y-1]<<5) + (pix[x-1][y-1]<<6) + (pix[x-1][y+1]<<7) + (pix[x+1][y-1]<<8) + (pix[x+2][y+2]<<9);
+*/
+
+/*
+
+for (int incr = 0; incr<4901; incr++) {
+printf("%d at %d %d", map[incr], incr%70, incr/70);
+};
+
+*/
