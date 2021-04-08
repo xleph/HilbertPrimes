@@ -1,0 +1,215 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
+
+bool isPrime(int num) {
+    if (num <= 3) {
+        return num > 1;
+    } else if (num % 2 == 0 || num % 3 == 0) {
+        return 0;
+    } else {
+        for (int i = 5; i * i <= num; i += 6) {
+            if (num % i == 0 || num % (i + 2) == 0) {
+                return 0;
+            }
+        }
+        return 1;
+    }
+}
+
+void move(int j,int pos[], bool pix[][4097]){
+pos[2]++;
+if (isPrime(pos[2])) {
+if (pos[3]) { 
+pix[pos[4]-pos[0]][pos[1]] = 1;
+} else {
+pix[pos[0]][pos[1]] = 1;
+};
+};
+if(j==1){
+pos[1]-=1;
+};
+if(j==2){
+pos[0]+=1;
+};
+if(j==3){
+pos[1]+=1;
+};
+if(j==4){
+pos[0]-=1;
+};
+};
+
+void hilbert(int r, int d, int l, int u, int i, int pos[], bool pix[][4097]){
+if(i>0){
+i--;
+hilbert(d,r,u,l,i,pos, pix);
+move(r,pos,pix);
+
+hilbert(r,d,l,u,i,pos, pix);
+move(d,pos,pix);
+
+hilbert(r,d,l,u,i,pos, pix);
+move(l,pos,pix);
+
+hilbert(u,l,d,r,i,pos, pix);
+};
+};
+
+int main(){
+// get values from stdin
+
+char data[500], ekey[10];
+printf("Enter Data : ");
+fgets(data, 500, stdin);
+printf("Enter Key : ");
+fgets(ekey, 10, stdin);
+
+int initio = (((ekey[0]-48)-(ekey[0]-48>>4)*7)<<12) + (((ekey[1]-48)-(ekey[1]-48>>4)*7)<<8) + (((ekey[2]-48)-(ekey[2]-48>>4)*7)<<4) + (((ekey[3]-48)-(ekey[3]-48>>4)*7));
+int sclx = (ekey[4]-48)-(ekey[4]-48>>4)*7;
+int scly = (ekey[5]-48)-(ekey[5]-48>>4)*7;
+
+int ev, n, pos[5];
+n = (((ekey[6]-48)-(ekey[6]-48>>4)*7)<<4) + ((ekey[7]-48)-(ekey[7]-48>>4)*7); // entry point nexus or something cool idk
+pos[0] = 0;
+pos[1] = 0;
+pos[2] = initio; // entry point for starting node
+pos[3] = 0;
+pos[4] = (1<<n)-1;
+bool pix[(1<<n)+1][4097];
+
+
+hilbert(2,3,4,1,n,pos, pix);
+pos[0] = 0;
+pos[1] = 0;
+pos[2] = initio;
+pos[3] = 1;
+hilbert(2,3,4,1,n,pos,pix);
+
+
+
+void setmap(int scalex, int scaley, int width, int map[4901][14]) {
+int x, y, ox, oy, inc, oinc, over;
+for (x = 0; x<70 ; x++) {
+	for (y = 0; y<70; y++) {
+	map[y*70+x][0]=pix[x*scalex+width][y*scaley+width];
+	ox = x*scalex+width;
+	oy = y*scaley+width;
+	over = 0;
+		for (oinc = 1; oinc<(width+1); oinc++) {
+		oy++;
+		over++;
+		map[y*70+x][over/6]+=pix[ox][oy]<<(over%6);
+			for (inc = 0; inc<(2*oinc-1); inc++) {
+			ox--;
+			over++;
+			map[y*70+x][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			oy--;
+			over++;
+			map[y*70+x][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			ox++;
+			over++;
+			map[y*70+x][over/6]+=pix[ox][oy]<<(over%6);
+			};
+			for (inc = 0; inc<(2*oinc); inc++) {
+			oy++;
+			over++;
+			map[y*70+x][over/6]+=pix[ox][oy]<<(over%6);
+			};
+		};
+	};
+};
+};
+
+void print_binary(int number) {
+	for (int incr = 5; incr>=0; incr--) {
+    putc(((number>>incr) & 1) ? '1' : '0', stdout);
+	};
+}
+
+bool isSame(int map[4901][14]) {
+int x, y, ind, ind2, osameness, sameness;
+osameness = 0;
+for (x = 0; x<70 ; x++) {
+	for (y = 0; y<70; y++) {
+		for (ind = 0; ind<4901; ind++) {
+		sameness = 0;
+                	for (ind2 = 0; ind2<14; ind2++) {
+				if (map[y*70+x][ind2]==map[ind][ind2]) {
+				sameness++;
+				};
+			};
+		osameness+=sameness/14;
+		};
+	};
+};
+return (osameness-4900)/2;
+};
+
+
+int xmap[4901][14];
+
+int width = (ekey[8]-48)-(ekey[8]-48>>4)*7; // entry point for spiral width
+if (!width) {
+width = 1;
+};
+setmap(sclx, scly, width, xmap);
+while(isSame(xmap)){
+width++;
+setmap(sclx, scly, width, xmap); // entry point for scale
+};
+
+int segcount = ((2*width+1)*(2*width+1)+5)/6;
+char xxmap[4901][segcount+1];
+int incre;
+int increm;
+for (incre = 0; incre<4901; incre++) {
+	for (increm = 0; increm<=segcount; increm++) {
+	xxmap[incre][increm] = xmap[incre][increm] + 33;
+	};
+	xxmap[incre][segcount] = 0;
+};
+
+// character encoding
+char snaz[255];
+snaz['!'] = 0;
+snaz['"'] = 1;
+snaz[':'] = 2;
+snaz['@'] = 3;
+snaz['-'] = 4;
+snaz['\n'] = 5;
+snaz[' '] = 5;
+snaz['.'] = 6;
+snaz[','] = 7;
+int nvm;
+for (nvm  = 65; nvm<91; nvm++) {
+snaz[nvm] = nvm - 57;
+};
+for (nvm = 97; nvm<123; nvm++) {
+snaz[nvm] = nvm - 63;
+};
+snaz['0'] = 60;
+snaz['1'] = 61;
+snaz['2'] = 62;
+snaz['3'] = 63;
+snaz['4'] = 64;
+snaz['5'] = 65;
+snaz['6'] = 66;
+snaz['7'] = 67;
+snaz['8'] = 68;
+snaz['9'] = 69;
+
+for (nvm = 0; nvm<500; nvm+=2) {
+if (data[nvm]==0||data[nvm+1]==0) {
+break;
+};
+printf("%s", xxmap[snaz[data[nvm]]+snaz[data[nvm+1]]*70]);
+};
+printf("\n");
+
+return 0;
+}
